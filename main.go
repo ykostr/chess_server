@@ -4,11 +4,17 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type PieceType int
 type Color int
+
+func (c Color) String() string {
+	if c == White {
+		return `white`
+	}
+	return `black`
+}
 
 const (
 	_ Color = iota
@@ -58,9 +64,16 @@ func (p *Position) makeMove(oldS, newS string) {
 	newRow, _ := strconv.Atoi(string(newS[1]))
 	oldRow, _ := strconv.Atoi(string(oldS[1]))
 
-	p[newRow-1][RowRev[string(newS[0])]] = p[oldRow-1][RowRev[string(oldS[0])]]
+	p.PieceSet[newRow-1][RowRev[string(newS[0])]] = p.PieceSet[oldRow-1][RowRev[string(oldS[0])]]
 
-	p[oldRow-1][RowRev[string(oldS[0])]] = &Piece{Type: Blank}
+	p.PieceSet[oldRow-1][RowRev[string(oldS[0])]] = &Piece{Type: Blank}
+
+	switch p.CurrentMoveColor {
+	case White:
+		p.CurrentMoveColor = Black
+	case Black:
+		p.CurrentMoveColor = White
+	}
 }
 
 func (p *Piece) String() string {
@@ -92,17 +105,34 @@ func (p *Piece) String() string {
 	return s
 }
 
-type Position [8][8]*Piece
+type Position struct {
+	PieceSet         [8][8]*Piece
+	CurrentMoveColor Color
+}
 
 func (p *Position) setPiece(row, col int, kind PieceType, c Color) {
-	p[row][col] = &Piece{Type: kind, Color: c}
+	p.PieceSet[row][col] = &Piece{Type: kind, Color: c}
 }
 
 type Game struct {
 	CurrentPosition *Position
+	Winner          *Color
 }
 
 var G *Game
+
+func (g *Game) Start() {
+	for g.Winner == nil {
+		if g.CurrentPosition.CurrentMoveColor == White {
+			var old, new string
+			fmt.Scanln(&old)
+			fmt.Scanln(&new)
+			fmt.Println(old, new)
+			g.CurrentPosition.makeMove(old, new)
+			return
+		}
+	}
+}
 
 func InitGame() {
 	G = new(Game)
@@ -112,9 +142,9 @@ func InitGame() {
 
 func (p *Position) String() string {
 	var res string = "  ---------------------------------\n"
-	for i := len(p) - 1; i >= 0; i-- {
+	for i := len(p.PieceSet) - 1; i >= 0; i-- {
 		res = res + `|` + fmt.Sprint(i+1) + `|`
-		for _, v := range p[i] {
+		for _, v := range p.PieceSet[i] {
 			res += fmt.Sprintf(` %s |`, v)
 		}
 		res += "\n  ---------------------------------\n"
@@ -124,7 +154,7 @@ func (p *Position) String() string {
 }
 
 func setPieceOnBoard(pos *Position, row, column int, t PieceType, c Color) {
-	pos[row][column] = &Piece{Type: t, Color: c}
+	pos.PieceSet[row][column] = &Piece{Type: t, Color: c}
 }
 
 func (position *Position) GetStartPosition() {
@@ -148,13 +178,14 @@ func (position *Position) GetStartPosition() {
 		position.setPiece(1, i, Pawn, White)
 		position.setPiece(6, i, Pawn, Black)
 	}
-	for i1, v := range position {
+	for i1, v := range position.PieceSet {
 		for i2, v1 := range v {
 			if v1 == nil {
-				position[i1][i2] = &Piece{Type: Blank}
+				position.PieceSet[i1][i2] = &Piece{Type: Blank}
 			}
 		}
 	}
+	position.CurrentMoveColor = White
 }
 
 func NewGame() *Game {
@@ -164,8 +195,6 @@ func NewGame() *Game {
 func main() {
 	InitGame()
 	fmt.Println(G.CurrentPosition)
-
-	G.CurrentPosition.makeMove(`e2`, `e4`)
-	time.Sleep(time.Second * 3)
+	G.Start()
 	fmt.Println(G.CurrentPosition)
 }
